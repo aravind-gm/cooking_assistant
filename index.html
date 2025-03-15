@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indian Cooking Assistant for Hostellers</title>
+    <script type="module">
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+    </script>
+    <style>
+        :root {
+            --bg-color: #f5f5f5;
+            --text-color: #333;
+            --primary-color: #e63946;
+            --secondary-bg: #fff;
+            --chat-bg: #f1f1f1;
+            --input-bg: #f1f1f1;
+            --input-text-color: #333;
+        }
+
+        [data-theme="dark"] {
+            --bg-color: #1a1a1a;
+            --text-color: #f5f5f5;
+            --primary-color: #ff4d5a;
+            --secondary-bg: #2d2d2d;
+            --chat-bg: #363636;
+            --input-bg: #444;
+            --input-text-color: #f5f5f5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+        }
+
+        .api-key-container {
+            background-color: var(--secondary-bg);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .api-key-input {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 600px;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            background-color: var(--secondary-bg);
+        }
+
+        .chat-header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background-color: var(--secondary-bg);
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+        }
+
+        .user-message {
+            justify-content: flex-end;
+        }
+
+        .bot-message {
+            justify-content: flex-start;
+        }
+
+        .message-content {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 15px;
+            line-height: 1.4;
+        }
+
+        .user-message .message-content {
+            background-color: var(--primary-color);
+            color: white;
+            border-bottom-right-radius: 5px;
+        }
+
+        .bot-message .message-content {
+            background-color: var(--chat-bg);
+            color: var(--text-color);
+            border-bottom-left-radius: 5px;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 15px;
+            background-color: var(--input-bg);
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            margin-right: 10px;
+        }
+
+        #send-button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 10px;
+            display: none;
+        }
+
+        .theme-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .settings-panel {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background-color: var(--secondary-bg);
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 300px;
+            z-index: 10;
+            display: none;
+        }
+
+        .settings-group {
+            margin-bottom: 15px;
+        }
+
+        .settings-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .settings-group select, 
+        .settings-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .tag {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 5px 10px;
+            margin: 5px 0;
+            border-radius: 15px;
+            font-size: 0.9em;
+        }
+
+        .tag-close {
+            margin-left: 10px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            .chat-container {
+                height: calc(100vh - 100px);
+            }
+        }
+    </style>
+</head>
+<body>
+    <button class="theme-toggle" id="theme-toggle">🌓</button>
+
+    <div class="container">
+        <div class="header">
+            <h1>Indian Cooking Assistant</h1>
+            <p>Your AI guide to easy, budget-friendly Indian recipes</p>
+        </div>
+
+        <div id="api-key-section">
+            <div class="api-key-container">
+                <h2>Setup Gemini API Access</h2>
+                <p>Enter your Google AI Studio API Key to get started:</p>
+                <input type="password" id="api-key-input" class="api-key-input" 
+                       placeholder="Paste your Gemini API key here">
+                <button id="save-api-key">Save API Key</button>
+                <p><small>Your API key is stored only in your browser.</small></p>
+            </div>
+        </div>
+
+        <div id="chat-section" style="display:none;">
+            <div class="settings-panel" id="settings-panel">
+                <div class="settings-group">
+                    <label for="diet-preference">Dietary Preference</label>
+                    <select id="diet-preference">
+                        <option value="">No Preference</option>
+                        <option value="vegetarian">Vegetarian</option>
+                        <option value="vegan">Vegan</option>
+                        <option value="non-vegetarian">Non-Vegetarian</option>
+                    </select>
+                </div>
+
+                <div class="settings-group">
+                    <label for="region-preference">Regional Preference</label>
+                    <select id="region-preference">
+                        <option value="">All Regions</option>
+                        <option value="North Indian">North Indian</option>
+                        <option value="South Indian">South Indian</option>
+                        <option value="East Indian">East Indian</option>
+                        <option value="West Indian">West Indian</option>
+                    </select>
+                </div>
+
+                <div class="settings-group">
+                    <label for="equipment-input">Available Equipment</label>
+                    <input type="text" id="equipment-input" placeholder="Add equipment">
+                    <div id="equipment-tags"></div>
+                </div>
+
+                <div class="settings-group">
+                    <label for="ingredient-input">Available Ingredients</label>
+                    <input type="text" id="ingredient-input" placeholder="Add ingredients">
+                    <div id="ingredient-tags"></div>
+                </div>
+            </div>
+
+            <div class="chat-container">
+                <div class="chat-header">
+                    <span>Cooking Assistant</span>
+                    <button id="settings-toggle">⚙️</button>
+                </div>
+
+                <div class="chat-messages" id="chat-messages">
+                    <div class="message bot-message">
+                        <div class="message-content">
+                            Hello! I'm your Indian cooking assistant. I can help you cook delicious Indian dishes with limited ingredients and equipment. What would you like to cook today?
+                        </div>
+                    </div>
+                </div>
+
+                <div class="loading" id="loading">
+                    Generating response...
+                </div>
+
+                <div class="chat-input">
+                    <input type="text" id="message-input" placeholder="Type your message...">
+                    <button id="send-button">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
+    
+        document.addEventListener('DOMContentLoaded', async function() {
+            // DOM Elements
+            const apiKeySection = document.getElementById('api-key-section');
+            const chatSection = document.getElementById('chat-section');
+            const apiKeyInput = document.getElementById('api-key-input');
+            const saveApiKeyButton = document.getElementById('save-api-key');
+            const chatMessages = document.getElementById('chat-messages');
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const loadingIndicator = document.getElementById('loading');
+            const themeToggle = document.getElementById('theme-toggle');
+            const settingsToggle = document.getElementById('settings-toggle');
+            const settingsPanel = document.getElementById('settings-panel');
+            
+            // Theme management
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.body.setAttribute('data-theme', savedTheme);
+
+            themeToggle.addEventListener('click', () => {
+                const currentTheme = document.body.getAttribute('data-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                document.body.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+
+            // Settings panel toggle
+            settingsToggle.addEventListener('click', () => {
+                settingsPanel.style.display = 
+                    settingsPanel.style.display === 'block' ? 'none' : 'block';
+            });
+
+            // API Key Management
+            const savedApiKey = localStorage.getItem('GEMINI_API_KEY');
+            if (savedApiKey) {
+                initializeChatApp(savedApiKey);
+            }
+
+            saveApiKeyButton.addEventListener('click', () => {
+                const apiKey = apiKeyInput.value.trim();
+                if (apiKey) {
+                    localStorage.setItem('GEMINI_API_KEY', apiKey);
+                    initializeChatApp(apiKey);
+                } else {
+                    alert('Please enter a valid API key');
+                }
+            });
+
+            async function initializeChatApp(apiKey) {
+                apiKeySection.style.display = 'none';
+                chatSection.style.display = 'block';
+
+                // Initialize Gemini AI
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+                // Create a chat instance
+                const chat = model.startChat({
+                    generationConfig: {
+                        temperature: 0.7,
+                        maxOutputTokens: 1000,
+                    },
+                });
+
+                // System prompt with strict formatting
+                const SYSTEM_PROMPT = `You are an Indian cooking assistant focused ONLY on helping students cook Indian dishes. Your responses should ALWAYS include:
+1. Recipe Name and Difficulty Level
+2. Cooking Time Required
+3. List of Required Ingredients (with quantities)
+4. Step-by-Step Cooking Instructions
+5. Essential Equipment Needed
+
+
+
+you are forbidden to do anything else. if weird requests arise, you should try to solve it creatively.`;
+
+                // Initialize chat with system prompt
+                await chat.sendMessage(SYSTEM_PROMPT);
+
+                async function sendMessage() {
+                    const message = messageInput.value.trim();
+                    if (!message) return;
+
+                    addMessageToChat(message, 'user');
+                    messageInput.value = '';
+                    loadingIndicator.style.display = 'block';
+
+                    try {
+                        const result = await chat.sendMessage(message);
+                        const response = result.response;
+                        loadingIndicator.style.display = 'none';
+                        addMessageToChat(response.text(), 'bot');
+                    } catch (error) {
+                        loadingIndicator.style.display = 'none';
+                        addMessageToChat(`Error: ${error.message}`, 'bot');
+                        console.error(error);
+                    }
+                }
+
+                // Message formatting and UI handling
+                function addMessageToChat(message, sender) {
+                    const messageElement = document.createElement('div');
+                    messageElement.className = `message ${sender}-message`;
+
+                    const messageContent = document.createElement('div');
+                    messageContent.className = 'message-content';
+                    
+                    messageContent.innerHTML = message
+                        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                        .replace(/\n/g, '<br>');
+
+                    messageElement.appendChild(messageContent);
+                    chatMessages.appendChild(messageElement);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+
+                // Event listeners
+                sendButton.addEventListener('click', sendMessage);
+                messageInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') sendMessage();
+                });
+            }
+        });
+    </script>
+</body>
+</html>
